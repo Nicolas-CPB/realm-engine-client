@@ -4,7 +4,7 @@ const runnerSource = readFileSync(new URL('../../../script-packages/farmer/oryx-
   .replace('export default class OryxRunner', 'return class OryxRunner');
 const OryxRunner = new Function(runnerSource)();
 const source = (name: string) => readFileSync(new URL(`../../../script-packages/${name}/index.mjs`, import.meta.url), 'utf8')
-  .replace(/^import .*;\n/gm, '').replace('export default class', 'return class');
+  .replace(/^import .*;\r?\n/gm, '').replace('export default class', 'return class');
 function fixture() {
   const pos = { x: 0.5, y: 0.5 };
   const beacon = { objectId: 40, objectClass: 'Beacon', name: 'Dead Church Beacon (Adept)', position: { x: 100.5, y: 0.5 } };
@@ -250,3 +250,19 @@ it('walks to distant adds and preserves a hidden boss encounter while adds remai
   expect(f.script.leaderQuest).not.toBeNull();
   expect(f.sdk.dodge.navigateToPosition).toHaveBeenLastCalledWith(add.position);
 });
+
+it('prioritizes and navigates to blue bags with stat potions', () => {
+  vi.useFakeTimers(); vi.setSystemTime(10000);
+  const f = fixture(); f.pos.x = 100.5;
+  f.sdk.loot.isStatPot = (type: number) => type === 2591;
+  f.sdk.loot.isUsefulStatPot = (type: number) => type === 2591;
+  f.sdk.loot.useFromBag = vi.fn(() => true);
+  f.sdk.loot.pickup = vi.fn(() => true);
+  f.script.onLoop();
+  const potBag = { objectId: 85, rarity: 'blue', position: f.mob.position, items: [{ objectType: 2591, slotIndex: 0 }] };
+  f.bags([potBag]);
+  f.script.onLoop();
+  expect(f.sdk.dodge.navigateToPosition).toHaveBeenLastCalledWith(potBag.position);
+  expect(f.script.lockId).toBe(0);
+});
+

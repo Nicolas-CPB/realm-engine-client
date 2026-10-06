@@ -7,7 +7,7 @@ export function tryInventoryAction(client: Owner, read: () => string, send: () =
   const now = Date.now();
   const pending = client[key];
   if (pending && pending.map === client.playerData.mapName) {
-    if (now - pending.at < 1300) return false;
+    if (now - pending.at < 1250) return false;
     // Bound a failed/unacknowledged action so it cannot disable looting forever.
     if (now - pending.at < 5000 && pending.read() === pending.before) return false;
   }

@@ -88,9 +88,6 @@ export class LootEngine {
         state.bagContactSince.set(bag.objectId, now);
         continue;
       }
-      // Require a second, settled position observation. This prevents an
-      // immediate swap while uDodge is merely crossing the bag at speed, which
-      // can disagree with the server's authoritative interaction position.
       if ((now - contactSince) < BAG_CONTACT_SETTLE_MS) continue;
       if (this.bags.shouldDelayPublicBag(bag, state, now)) continue;
       // First pickup on a bag is immediate; later ones use the configured,

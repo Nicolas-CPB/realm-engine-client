@@ -27,13 +27,18 @@ void ResolveSWA()
 {
     if (s_swaResolved) return;
     const MethodInfo* method = Il2CppHook::ResolveMethodCached(kShootClass, kSWAMethod, 1, false);
-    if (!method) return;
-    const auto* binding = BuildBindings::Method(BuildBindings::ClassName(kShootClass), kSWAMethod, 1);
-    const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetModuleHandleW(L"GameAssembly.dll"));
-    if (!ShootBindingReadiness::MatchesMethodBinding(
-            binding && BuildBindings::gameAssemblySha256[0] && BuildBindings::metadataSha256[0],
-            moduleBase, reinterpret_cast<uintptr_t>(method->methodPointer), binding ? binding->rva : 0))
-        return;
+    if (!method || !method->methodPointer) return;
+
+    const bool hasBindings = (BuildBindings::methods[0].owner[0] != '\0');
+    if (hasBindings) {
+        const auto* binding = BuildBindings::Method(BuildBindings::ClassName(kShootClass), kSWAMethod, 1);
+        const uintptr_t moduleBase = reinterpret_cast<uintptr_t>(GetModuleHandleW(L"GameAssembly.dll"));
+        if (!ShootBindingReadiness::MatchesMethodBinding(
+                binding && BuildBindings::gameAssemblySha256[0] && BuildBindings::metadataSha256[0],
+                moduleBase, reinterpret_cast<uintptr_t>(method->methodPointer), binding ? binding->rva : 0))
+            return;
+    }
+
     s_fnSWA = reinterpret_cast<ShootWithAngleFn>(method->methodPointer);
     s_miSWA = method;
     s_swaResolved = true;

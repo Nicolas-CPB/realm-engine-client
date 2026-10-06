@@ -39,3 +39,8 @@ client/assets/injector.exe
 # proxy sources are ready to replace it.
 client/winhttp-proxy/winhttp.dll
 client/assets/*.obj
+
+# Dependencies & local artifacts
+node_modules/
+.vite/
+*.mp4

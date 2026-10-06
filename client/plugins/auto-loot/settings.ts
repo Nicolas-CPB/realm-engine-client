@@ -77,7 +77,7 @@ export class AutoLootSettings {
   minEnchantTier = 0;
 
   // Behaviour toggles
-  publicDelay = true;
+  publicDelay = false;
   disableWhenIdle = true;
   useBackpack = true;
   preferBackpack = false;
@@ -256,9 +256,9 @@ export class AutoLootSettings {
       () => this.autodrinkStatPots, (v) => { this.autodrinkStatPots = v; }, true);
 
     ctx.registerSetting('pickupIntervalMs', {
-      label: 'Pickup interval (ms)', advanced: true,
+      label: 'Pickup interval (ms)',
       type: 'number', value: this.pickupIntervalMs,
-      min: MIN_PICKUP_INTERVAL_MS, max: MAX_PICKUP_INTERVAL_MS, step: 50,
+      min: MIN_PICKUP_INTERVAL_MS, max: MAX_PICKUP_INTERVAL_MS, step: 25,
     }, (v: number) => {
       this.pickupIntervalMs = clamp(
         Math.trunc(Number(v) || DEFAULT_PICKUP_INTERVAL_MS),
@@ -267,7 +267,7 @@ export class AutoLootSettings {
     });
 
     ctx.registerSetting('maxLootActionsPerSec', {
-      label: 'Max loot actions / sec', advanced: true,
+      label: 'Max loot actions / sec',
       type: 'range', value: this.maxLootActionsPerSec,
       min: MIN_MAX_LOOT_ACTIONS_PER_SEC, max: MAX_MAX_LOOT_ACTIONS_PER_SEC, step: 1,
     }, (v: number) => {
@@ -296,7 +296,7 @@ export class AutoLootSettings {
       () => this.lootLifeManaPotions, (v) => { this.lootLifeManaPotions = v; }, true);
     boolSetting('lootMarks', 'Loot Marks', () => this.lootMarks, (v) => { this.lootMarks = v; });
     boolSetting('lootEggs', 'Loot Eggs', () => this.lootEggs, (v) => { this.lootEggs = v; });
-    boolSetting('publicDelay', 'Public Delay', () => this.publicDelay, (v) => { this.publicDelay = v; }, true);
+    boolSetting('publicDelay', 'Public Delay', () => this.publicDelay, (v) => { this.publicDelay = v; });
     boolSetting('disableWhenIdle', 'Disable When Idle',
       () => this.disableWhenIdle, (v) => { this.disableWhenIdle = v; }, true);
     boolSetting('useBackpack', 'Use Backpack', () => this.useBackpack, (v) => { this.useBackpack = v; }, true);

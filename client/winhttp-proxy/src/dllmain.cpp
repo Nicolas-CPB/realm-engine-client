@@ -20,7 +20,6 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved) {
             DisableThreadLibraryCalls(hinst);
             HANDLE t = CreateThread(nullptr, 0, InitThread, nullptr, 0, nullptr);
             if (t) CloseHandle(t);
-            splashbypass::Install();
             break;
         }
         case DLL_PROCESS_DETACH:

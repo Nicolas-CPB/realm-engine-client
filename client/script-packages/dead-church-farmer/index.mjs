@@ -34,7 +34,7 @@ export default class DeadChurchFarmer extends Farmer {
   onStart() {
     super.onStart();
     RealmEngine.ui.status('Dead Church Farmer: locating beacon');
-    RealmEngine.log.info('Dead Church Farmer: biome mobs only; white bags take priority.');
+    RealmEngine.log.info('Dead Church Farmer: biome mobs only; white and stat potion bags take priority.');
   }
 
   resetMap(name) {
@@ -116,10 +116,73 @@ export default class DeadChurchFarmer extends Farmer {
   }
 
   bagIsUseful(bag) {
-    // Keep already-selected white bags eligible when dodging carries us outside
-    // the biome. Other biomes' drops do not become cross-map detours.
-    return bag.rarity === 'white' && bag.items.length > 0
-      && (bag.objectId === this.lootBagId || this.inBiome(bag.position));
+    if (!bag || !bag.items || bag.items.length === 0) return false;
+    // Collect white bags, blue bags (stat pots / cyan), and any bag containing stat potions.
+    const isDesired = bag.rarity === 'white'
+      || bag.rarity === 'blue'
+      || bag.items.some((item) => RealmEngine.loot.isStatPot?.(item.objectType) || RealmEngine.loot.isUsefulStatPot?.(item.objectType));
+    return isDesired && (bag.objectId === this.lootBagId || this.inBiome(bag.position));
+  }
+
+  handleLoot(now, whiteOnly = false) {
+    if (!whiteOnly && this.useInventoryUpgradesAndPots(now)) return true;
+    let bag = this.lootBagId
+      ? RealmEngine.loot.getBags().find((b) => b.objectId === this.lootBagId && this.bagIsUseful(b)
+        && (!whiteOnly || b.rarity === 'white'))
+      : null;
+    if (!bag) {
+      bag = this.chooseLootBag(whiteOnly);
+      this.lootBagId = bag?.objectId ?? 0;
+      this.lootArrivedAt = 0;
+    }
+    if (!bag) return false;
+
+    const distance = RealmEngine.self.distanceTo(bag.position);
+    if (distance > 0.7) {
+      RealmEngine.dodge.navigateToPosition(bag.position);
+      this.setStatus(`Loot detour (${distance.toFixed(1)} tiles)`);
+      return true;
+    }
+
+    RealmEngine.dodge.clearWaypoint();
+    if (!this.lootArrivedAt) this.lootArrivedAt = now;
+    this.setStatus(bag.rarity === 'white' ? 'Collecting white bag' : 'Collecting loot bag');
+    if (now - this.lootArrivedAt < 750 || now - this.lastItemActionAt < 1300) return true;
+
+    if (bag.rarity === 'white') {
+      const sent = RealmEngine.loot.pickupId(bag.objectId, { maxDistance: 1.0, useBackpack: true });
+      if (sent > 0) {
+        this.lastItemActionAt = now;
+        return true;
+      }
+    }
+
+    for (const item of bag.items) {
+      if ((RealmEngine.loot.isUT(item.objectType) || RealmEngine.loot.isST(item.objectType))
+          && RealmEngine.loot.pickup(bag, item.slotIndex, { useBackpack: true })) {
+        this.lastItemActionAt = now;
+        return true;
+      }
+      if (RealmEngine.loot.isUsefulStatPot(item.objectType)
+          && RealmEngine.loot.useFromBag(bag, item.slotIndex)) {
+        this.lastItemActionAt = now;
+        return true;
+      }
+      if (RealmEngine.loot.isStatPot(item.objectType)
+          && RealmEngine.loot.pickup(bag, item.slotIndex, { useBackpack: true })) {
+        this.lastItemActionAt = now;
+        return true;
+      }
+      if (RealmEngine.loot.isEquipmentUpgrade(item.objectType)
+          && RealmEngine.loot.equipFromBag(bag, item.slotIndex)) {
+        this.lastItemActionAt = now;
+        return true;
+      }
+    }
+    if (now - this.lastItemActionAt < 5000) return true;
+    this.lootRetryAfter.set(bag.objectId, now + 30000);
+    this.lootBagId = 0;
+    return false;
   }
 
   observeLeaderQuest() {
@@ -174,7 +237,7 @@ export default class DeadChurchFarmer extends Farmer {
     if ((enemy && enemy.hp <= 0) || (!enemy && this.leaderArrived)) {
       if (this.leaderMissingAt === null) this.leaderMissingAt = now;
       if ((enemy && enemy.hp <= 0 && now - this.leaderMissingAt >= 3000)
-          || (questMovedOn && now - this.leaderMissingAt >= 30000)) {
+          || (questMovedOn && now - this.leaderMissingAt >= 3000)) {
         this.finishedLeaders.add(this.leaderQuest.objectId);
         this.leaderQuest = null; this.leaderArrived = false; this.leaderMissingAt = null;
         this.updateTarget(0, false); RealmEngine.dodge.clearWaypoint();
@@ -184,7 +247,20 @@ export default class DeadChurchFarmer extends Farmer {
       }
     } else if (!enemy) this.leaderMissingAt = null;
     if (clearingAdds) {
-      this.handleBossAdds(adds, this.leaderQuest, 'Dead Church leader');
+      if (adds.length > 0) {
+        this.handleBossAdds(adds, this.leaderQuest, 'Dead Church leader');
+        return true;
+      }
+      // When adds are cleared and the boss is not visible, don't stand frozen in place:
+      // patrol in an orbit around the boss area to keep moving, dodging, and discovering mobs.
+      const angle = (now / 2500) * (2 * Math.PI);
+      const orbit = {
+        x: this.leaderQuest.position.x + Math.cos(angle) * 5,
+        y: this.leaderQuest.position.y + Math.sin(angle) * 5,
+      };
+      RealmEngine.dodge.navigateToPosition(orbit);
+      this.updateTarget(0, false);
+      RealmEngine.ui.status('Dead Church: patrolling boss area for phase transition or adds');
       return true;
     }
     if (enemy && enemy.hp > 0 && distance <= (this.lockId === enemy.objectId ? 12 : 8)) {
@@ -201,7 +277,12 @@ export default class DeadChurchFarmer extends Farmer {
     }
     this.updateTarget(0, false);
     if ((!enemy && this.leaderArrived) || (enemy && enemy.hp <= 0)) {
-      RealmEngine.dodge.clearWaypoint();
+      const angle = (now / 2500) * (2 * Math.PI);
+      const orbit = {
+        x: this.leaderQuest.position.x + Math.cos(angle) * 5,
+        y: this.leaderQuest.position.y + Math.sin(angle) * 5,
+      };
+      RealmEngine.dodge.navigateToPosition(orbit);
       RealmEngine.ui.status('Dead Church: waiting for Shady Sect Leader phase');
     } else {
       if (!this.leaderArrived && this.tryBeaconTeleport(now, this.leaderQuest)) return true;

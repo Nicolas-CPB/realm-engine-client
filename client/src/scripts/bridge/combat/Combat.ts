@@ -162,9 +162,9 @@ export class BridgeCombat {
     Combat.aimAt = (target: number | { objectId: number }, options?: CombatAimOptions) => {
       const objectId = normalizeObjectId(target);
       if (objectId == null) return false;
-      // AutoAim-only lock. KillAura chooses independently; UDodge receives its
-      // boss lock through Dodge.lockEnemy after navigation reaches the area.
-      clearAim();
+      // AutoAim lock: set proxy rewrite target and forward to DLL
+      aimTarget = { kind: 'object', objectId };
+      autoAimEnabled = true;
       // Lift before locking so no frame sees the lock without the lift.
       if (options?.includeStructures) liftStructureFilters();
       else restoreStructureFilters();

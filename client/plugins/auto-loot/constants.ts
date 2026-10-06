@@ -25,15 +25,15 @@ export const DEFAULT_MIN_RING_TIER = 6;
 /** Spacing between *consecutive* pickups/drinks; the first pickup on a bag is immediate. */
 export const PICKUP_INTERVAL_MS = 250;
 /** Configurable spacing between pickups; PICKUP_INTERVAL_MS is the floor. */
-export const DEFAULT_PICKUP_INTERVAL_MS = 400;
-export const MIN_PICKUP_INTERVAL_MS = 250;
+export const DEFAULT_PICKUP_INTERVAL_MS = 300;
+export const MIN_PICKUP_INTERVAL_MS = 200;
 export const MAX_PICKUP_INTERVAL_MS = 2000;
 /**
  * Ceiling on loot packets per second. INVENTORYSWAP is a rare, user-driven
  * packet in the real client, and a sustained stream of them is what the server
  * closes the connection over.
  */
-export const DEFAULT_MAX_LOOT_ACTIONS_PER_SEC = 3;
+export const DEFAULT_MAX_LOOT_ACTIONS_PER_SEC = 4;
 export const MIN_MAX_LOOT_ACTIONS_PER_SEC = 1;
 export const MAX_MAX_LOOT_ACTIONS_PER_SEC = 8;
 /**
@@ -52,7 +52,7 @@ export const BAG_SLOT_CONSUME_MS = 30000;
 // the server-side position had actually reached it.
 export const ON_TOP_DISTANCE = 0.65;
 export const BAG_CONTACT_SETTLE_MS = 125;
-export const PUBLIC_BAG_DELAY_MS = 2000;
+export const PUBLIC_BAG_DELAY_MS = 0;
 export const STATIONARY_TICK_LIMIT = 100;
 export const MOVEMENT_EPSILON = 0.05;
 

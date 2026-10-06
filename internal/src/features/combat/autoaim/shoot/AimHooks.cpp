@@ -132,6 +132,16 @@ static void NoteAimSource()
     }
 }
 
+static void LogRedirect(float px, float py, float angle)
+{
+    static ULONGLONG s_lastRedirectLog = 0;
+    const ULONGLONG now = GetTickCount64();
+    if (now - s_lastRedirectLog >= 2000ULL) {
+        s_lastRedirectLog = now;
+        DBG_FILE_LOG("[AimHooks] redirecting shot from (" << px << ", " << py << ") to angle " << angle);
+    }
+}
+
 // ── Detour implementations ────────────────────────────────────────────────────
 void __fastcall ShootWithAngleDetour(void* player, float angle, void* method)
 {
@@ -145,8 +155,10 @@ void __fastcall ShootWithAngleDetour(void* player, float angle, void* method)
             ok = true;
         } __except (EXCEPTION_EXECUTE_HANDLER) {}
         float newAngle = 0.f;
-        if (ok && RedirectAngle(px, py, newAngle))
+        if (ok && RedirectAngle(px, py, newAngle)) {
+            LogRedirect(px, py, newAngle);
             angle = newAngle;
+        }
     }
     g_swaOrig(player, angle, method);
 }
@@ -190,17 +202,29 @@ bool Install()
 {
     if (s_installed) return true;
 
-    if (!ShootRuntime::EnsureResolved()) return false;
+    ShootRuntime::EnsureResolved();
     g_swaTarget = Il2CppHook::ResolveMethod(kShootClass,  kSWAMethod, 1, /*loose*/false);
     g_sspTarget = Il2CppHook::ResolveMethod(kShootClass,  kSSPMethod, 2, /*loose*/false);
-    if (!g_swaTarget || !g_sspTarget) return false;
+    if (!g_swaTarget || !g_sspTarget) {
+        DBG_FILE_LOG("[AimHooks] failed to resolve SWA or SSP target (swa=" << g_swaTarget << " ssp=" << g_sspTarget << ")");
+        return false;
+    }
 
-    if (!Il2CppHook::EnsureRuntime("AutoAim")) return false;
+    if (!Il2CppHook::EnsureRuntime("AutoAim")) {
+        DBG_FILE_LOG("[AimHooks] EnsureRuntime failed");
+        return false;
+    }
 
     if (!Il2CppHook::InstallMinHook(g_swaTarget, reinterpret_cast<void*>(&ShootWithAngleDetour),
-                                    reinterpret_cast<void**>(&g_swaOrig), "AutoAim.SWA")) return false;
+                                    reinterpret_cast<void**>(&g_swaOrig), "AutoAim.SWA")) {
+        DBG_FILE_LOG("[AimHooks] InstallMinHook SWA failed");
+        return false;
+    }
     if (!Il2CppHook::InstallMinHook(g_sspTarget, reinterpret_cast<void*>(&SendShotPacketDetour),
-                                    reinterpret_cast<void**>(&g_sspOrig), "AutoAim.SSP")) return false;
+                                    reinterpret_cast<void**>(&g_sspOrig), "AutoAim.SSP")) {
+        DBG_FILE_LOG("[AimHooks] InstallMinHook SSP failed");
+        return false;
+    }
 
     s_installed = true;
     // One-shot (Install self-guards on s_installed): says out loud what this

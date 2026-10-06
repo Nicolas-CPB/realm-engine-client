@@ -171,6 +171,14 @@ static void RunTick()
     // Aim is inactive — clear target. Hooks must be installed and the player must
     // not be stealthed (when ShootWhileStealthed is off).
     if (!aimOn || !local || !AimHooks::IsInstalled() || LocalStealthBlocksAim(local)) {
+        static ULONGLONG s_lastFailLogMs = 0;
+        const ULONGLONG now = GetTickCount64();
+        if (aimOn && now - s_lastFailLogMs >= 5000ULL) {
+            s_lastFailLogMs = now;
+            DBG_FILE_LOG("[AutoAim] tick blocked: local=" << (local ? "ok" : "null")
+                         << " hooksInstalled=" << (AimHooks::IsInstalled() ? "yes" : "no")
+                         << " stealthBlocks=" << (local ? (LocalStealthBlocksAim(local) ? "yes" : "no") : "n/a"));
+        }
         s_hasTarget.store(false, std::memory_order_relaxed);
         s_aimFocusId.store(0, std::memory_order_relaxed);
         AimHooks::SetTarget(false, 0.f, 0.f);
@@ -206,6 +214,20 @@ static void RunTick()
     const TargetSelector::Result result = TargetSelector::Select(
         cfg, px, py, 0.f, 0.f, WeaponCalibrator::GetProfile());
     DiagLockEngagement(cfg, result, px, py);
+
+    static int32_t   s_lastTargetLogged = 0;
+    static ULONGLONG s_lastTargetLogMs  = 0;
+    const ULONGLONG now = GetTickCount64();
+    if (result.found && (result.enemyId != s_lastTargetLogged || now - s_lastTargetLogMs >= 3000ULL)) {
+        s_lastTargetLogged = result.enemyId;
+        s_lastTargetLogMs  = now;
+        DBG_FILE_LOG("[AutoAim] targeting enemy id=" << result.enemyId << " type=0x"
+                     << std::hex << result.objType << std::dec
+                     << " at (" << result.aimX << ", " << result.aimY << ")");
+    } else if (!result.found && s_lastTargetLogged != 0) {
+        s_lastTargetLogged = 0;
+        DBG_FILE_LOG("[AutoAim] no target found");
+    }
 
     s_hasTarget.store(result.found, std::memory_order_relaxed);
     s_aimX.store(result.aimX, std::memory_order_relaxed);
@@ -247,6 +269,7 @@ void Tick()
 
 void SetEnabled(bool on) {
     s_enabled.store(on, std::memory_order_relaxed);
+    DBG_FILE_LOG("[AutoAim] SetEnabled -> " << (on ? "true" : "false"));
     if (!on) {
         s_hasTarget.store(false, std::memory_order_relaxed);
         AimHooks::SetTarget(false, 0.f, 0.f);
@@ -257,6 +280,7 @@ bool IsEnabled() { return s_enabled.load(std::memory_order_relaxed); }
 void SetAimMode(TargetSelector::Mode mode) {
     const int raw = static_cast<int>(mode);
     s_aimModeInt.store((raw < 0 || raw > 3) ? 0 : raw, std::memory_order_relaxed);
+    DBG_FILE_LOG("[AutoAim] SetAimMode -> " << raw);
 }
 TargetSelector::Mode GetAimMode() {
     return static_cast<TargetSelector::Mode>(s_aimModeInt.load(std::memory_order_relaxed));
